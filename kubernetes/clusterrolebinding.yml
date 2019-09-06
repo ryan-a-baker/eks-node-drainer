@@ -1,0 +1,12 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: eks-node-drainer
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: eks-node-drainer
+subjects:
+- apiGroup: rbac.authorization.k8s.io
+  kind: Group
+  name: eks-node-drainer

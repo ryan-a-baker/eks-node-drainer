@@ -1,0 +1,124 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Metadata:
+  License: Apache-2.0
+Description: 'Lamba that will drain a EKS node when a lifecycle event is recieved that it will be terminated'
+Parameters:
+  ASGToWatch:
+    Type: CommaDelimitedList
+    Description: The list of ASG's to watch for lifecycle events.
+  LambdaVPCID:
+    Type: String
+    Description: The ID Of the VPC to run the Lambda Function in
+  LambdaVPCSubnets:
+    Type: CommaDelimitedList
+    Description: The list of subnets to run the Lambda Function in
+
+Resources:
+### CloudWatch Event
+  eksnodedrainevent:
+    Type: AWS::Events::Rule
+    Properties:
+      Name: "eks-node-drainer"
+      Description: "Invokes the EKS Node Drainer Lambda when a terminate lifecycle event is recieved"
+      EventPattern:
+        source:
+          - "aws.autoscaling"
+        detail-type:
+          - "EC2 Instance-terminate Lifecycle Action"
+        detail:
+          AutoScalingGroupName:
+            Ref: ASGToWatch
+      State: "ENABLED"
+      Targets:
+        -
+          Id: eks-node-drainer
+          Arn: !GetAtt eksnodedrainlambda.Arn
+  PermissionForEventsToInvokeLambda:
+    Type: AWS::Lambda::Permission
+    Properties:
+      FunctionName:
+        Ref: "eksnodedrainlambda"
+      Action: "lambda:InvokeFunction"
+      Principal: "events.amazonaws.com"
+      SourceArn: !GetAtt eksnodedrainevent.Arn
+  eksnodedrainersg:
+    Type: AWS::EC2::SecurityGroup
+    Properties:
+        GroupDescription: Allow EKS Node Drainer Lambda to talk to EKS
+        VpcId: !Ref LambdaVPCID
+        SecurityGroupEgress:
+        - IpProtocol: tcp
+          FromPort: 443
+          ToPort: 443
+          CidrIp: "0.0.0.0/0"
+### Lambda
+  eksnodedrainlambda:
+    Type: "AWS::Lambda::Function"
+    Properties:
+      FunctionName: eks-node-drainer
+      Handler: "drain_node_lambda.lambda_handler"
+      Role: !GetAtt eksnodedrainiamrole.Arn
+      Code:
+        S3Bucket: "eks-node-drainer"
+        S3Key: "drain.zip"
+      Runtime: "python3.7"
+      Timeout: 900
+      VpcConfig:
+        SecurityGroupIds:
+          - !Ref eksnodedrainersg
+        SubnetIds:
+#          - "subnet-5f377226"
+#          - "subnet-9493f4df"
+            Ref: LambdaVPCSubnets
+### IAM
+  eksnodedrainiamrole:
+    Type: AWS::IAM::Role
+    Properties:
+      RoleName: eks-node-drainer
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service: lambda.amazonaws.com
+          Action: sts:AssumeRole
+      ManagedPolicyArns: []
+      Policies:
+      - PolicyName: Allow-Lifecycle-Update
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Action:
+            - autoscaling:CompleteLifecycleAction
+            Effect: Allow
+            Resource: "*"
+      - PolicyName: Allow-CloudWatch-Logs
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Action:
+            - logs:CreateLogGroup
+            - logs:CreateLogStream
+            - logs:PutLogEvents
+            Effect: Allow
+            Resource: "*"
+      - PolicyName: DescribeEC2Instances
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Action:
+            - ec2:DescribeInstances
+            - ec2:DescribeNetworkInterfaces
+            - ec2:CreateNetworkInterface
+            - ec2:DeleteNetworkInterface
+            Effect: Allow
+            Resource: "*"
+      - PolicyName: EKS-ReadClusters
+        PolicyDocument:
+          Version: '2012-10-17'
+          Statement:
+          - Action:
+            - eks:DescribeCluster
+            - eks:ListClusters
+            Effect: Allow
+            Resource: "*"
