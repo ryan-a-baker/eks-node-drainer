@@ -4,11 +4,12 @@ A Framework to drain pods from nodes before termination for EKS.  A full blog po
 
 # Deploying the Project
 
-Deploying the service is a simple 3 step process.
+Deploying the service is a simple 4 step process.
 
-1. Create the ASG Lifecycle Hook
-2. Deploy the CloudFormation which creates the CloudWatch Event Rule, Lambda, and the needed IAM Roles.
-3. Apply the K8S roles to allow the Lambda to authenticate with K8S
+1. Create the ASG Lifecycle hook
+2. Create a "eks-node-drainer" bucket and upload the drainer.zip to it
+3. Deploy the CloudFormation which creates the CloudWatch Event Rule, Lambda, and the needed IAM Roles.
+4. Apply the K8S roles to allow the Lambda to authenticate with K8S
 
 ## Create the ASG Lifecycle Hook
 
@@ -40,15 +41,19 @@ Take a deep breath, that's the last manual thing you'll have to do.  The rest is
 Assuming you have the AWS CLI setup, you can run the CloudFormation template with the following:
 
 ```
-aws cloudformation update-stack \
+aws cloudformation create-stack \
     --template-body file://cloudformation.yaml \
     --stack-name eks-node-drainer \
     --capabilities CAPABILITY_NAMED_IAM \
-    --parameters ParameterKey=ASGToWatch,ParameterValue=\"eks-us-west-2-testing-cluster-NodeGroup-15RUYBMP2JKKA,eks-us-west-2-non-prod-cluster-NodeGroup-1LY177EYAP560,eks-us-west-2-prod-cluster-NodeGroup-50N357EH0MVF\" \
-    ParameterKey=LambdaVPCSubnets,ParameterValue=\"subnet-5f377226,subnet-9493f4df\" \
-    ParameterKey=LambdaVPCID,ParameterValue="vpc-b10c51da\n"
-
-aws transcribe start-transcription-job \
-     --region region \
-     --cli-input-json file://test-start-command.json
+    --parameters ParameterKey=ASGToWatch,ParameterValue=\"<comma separated asg group names>\" \
+    ParameterKey=LambdaVPCSubnets,ParameterValue=\"<comma seperated vpc subnet ids\" \
+    ParameterKey=LambdaVPCID,ParameterValue="<vpc id>\n"
 ```
+
+##  Apply the Kubernetes roles
+
+The eks-iam-authenticator in the Lambda will allow us to authenticate to the K8S API using the IAM role that's applied to the Lambda.  Given that I'm trying to maintain a "least-privileged" model, I created roles that only have the permission needed for the service (list pods, patch nodes for cordoning, and evict pods).
+
+To apply these roles just simply run:
+
+```kubectl apply -f clusterrole.yml clusterrolebinding.yml```
