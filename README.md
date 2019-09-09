@@ -4,7 +4,7 @@ A Framework to drain pods from nodes before termination for EKS.  A full blog po
 
 # Deploying the Project
 
-Deploying the service is a simple 4 step process.
+Deploying the service is a 4 step process.
 
 1. Create the ASG Lifecycle hook
 2. Create a "eks-node-drainer" bucket and upload the drainer.zip to it
@@ -14,9 +14,9 @@ Deploying the service is a simple 4 step process.
 ## Create the ASG Lifecycle Hook
 
 The auto-scaling group for the EKS cluster is deployed as part of the [cluster configuration](https://amazon-eks.s3-us-west-2.amazonaws.com/cloudformation/2019-01-
-09/amazon-eks-nodegroup.yaml) that Amazon provides in their [quick-start guide](https://s3.amazonaws.com/aws-quickstart/quickstart-amazon-eks/doc/amazon-eks-architecture.pdf).  Because of this, this is the only part of this deployment that you will have to manually do.  Ideally, it would be best to update the Cloudformation you used to launch your cluster, but given that Amazon has released many versions of this template, it would be difficult to document every permutation, but doing it manually will work fine.  Just make sure if you run an update via CloudFormation after this is added that you ensure the lifecycle hook persists as it could be removed since it is added out-of-band.
+09/amazon-eks-nodegroup.yaml) that Amazon provides in their [quick-start guide](https://s3.amazonaws.com/aws-quickstart/quickstart-amazon-eks/doc/amazon-eks-architecture.pdf).  Because of this automation, this ASG lifecycle hook is the only part of this deployment that you will have to manually do.  Ideally, it would be best to update the Cloudformation you used to launch your cluster, but given that Amazon has released many versions of this template, it would be difficult to document every permutation, but doing it manually will work fine.  Just make sure if you run an update via CloudFormation after this is added that you ensure the lifecycle hook persists as it could be removed since it is added out-of-band.
 
-It's simple to add the lifecycle hook, just navigate to the AWS EC2 Dashboard->Auto Scaling Groups and locate your clusters auto scaling group.  It will be named the same as your cluster + "-cluster-NodeGroup-<random string>" appended to the end.  Once selected, navigate to the "Lifecycle Hook" tab and click "Create Lifecycle Hook" button.
+It's about one step to add the lifecycle hook, navigate to the AWS EC2 Dashboard->Auto Scaling Groups and locate your clusters auto scaling group.  It will be named the same as your cluster + "-cluster-NodeGroup-<random string>" appended to the end.  Once selected, navigate to the "Lifecycle Hook" tab and click "Create Lifecycle Hook" button.
 
 ![Create Lifecycle Hook](https://github.com/ryan-a-baker/ryanbakerio/blob/master/img/lifecyclehookcreate.png?raw=true){: .center-block :}
 
@@ -54,6 +54,6 @@ aws cloudformation create-stack \
 
 The eks-iam-authenticator in the Lambda will allow us to authenticate to the K8S API using the IAM role that's applied to the Lambda.  Given that I'm trying to maintain a "least-privileged" model, I created roles that only have the permission needed for the service (list pods, patch nodes for cordoning, and evict pods).
 
-To apply these roles just simply run:
+To apply these roles just run:
 
 ```kubectl apply -f clusterrole.yml clusterrolebinding.yml```
