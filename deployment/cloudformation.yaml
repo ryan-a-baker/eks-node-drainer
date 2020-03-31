@@ -67,8 +67,6 @@ Resources:
         SecurityGroupIds:
           - !Ref eksnodedrainersg
         SubnetIds:
-#          - "subnet-5f377226"
-#          - "subnet-9493f4df"
             Ref: LambdaVPCSubnets
 ### IAM
   eksnodedrainiamrole:
